@@ -1,51 +1,49 @@
 .tile {
-  display: grid;
-  place-content: center;
-  width: 100px;
-  height: 100px;
-}
-
-.tile .chess-piece {
-  width: 100px;
-  height: 100px;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 100px;
-}
-
-.tile .chess-piece:hover {
-  cursor: grab;
-}
-
-.tile .chess-piece:active {
-  cursor: grabbing;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
 }
 
 .black-tile {
-  background-color: #779556;
+  background-color: #779952; /* Chess.com dark green */
 }
 
 .white-tile {
-  background-color: #ebecd0;
+  background-color: #edeed1; /* Chess.com light beige */
 }
 
-.tile img {
-  width: 80px;
+.tile-highlight {
+  position: relative;
+  background-color: rgba(255, 255, 0, 0.4); /* Chess.com-style highlight */
+  z-index: 1; /* Ensure highlight is below piece but above tile */
 }
 
-.tile-highlight:not(.chess-piece-tile)::before {
-  content: " ";
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background-color: rgba(0, 0, 0, 0.4);
+.chess-piece-tile {
+  /* Optional: Add subtle styling for tiles with pieces if needed */
 }
 
-.tile-highlight.chess-piece-tile::before {
+.chess-piece {
+  width: 100%;
+  height: 100%;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  object-fit: contain; /* Ensures image scales correctly */
   position: absolute;
-  content: " ";
-  width: 90px;
-  height: 90px;
-  border: 5px solid rgba(0, 0, 0, 0.4);
-  border-radius: 50%;
+  top: 0;
+  left: 0;
+  z-index: 2; /* Pieces above highlights */
+}
+
+/* Optional coordinate styling */
+.tile-coordinate {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.5);
+  pointer-events: none; /* Prevent interference with dragging */
 }
