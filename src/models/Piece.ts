@@ -58,7 +58,7 @@ export class Piece {
     this._possibleMoves = value.map((m) => m.clone());
   }
 
-  isPawn(): this is Pawn {
+  isPawn(): boolean {
     return this._type === PieceType.PAWN;
   }
 
@@ -105,4 +105,5 @@ export class Piece {
   }
 }
 
-export { Pawn } from "./Pawn";
+// Remove this if Pawn.ts imports Piece.ts to avoid circular dependency
+// export { Pawn } from "./Pawn";
