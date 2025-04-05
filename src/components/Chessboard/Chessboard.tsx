@@ -16,7 +16,7 @@ export default function Chessboard({ playMove, pieces }: Props) {
 
   // Unified event handler for grabbing a piece (mouse or touch)
   function grabPiece(e: React.MouseEvent | React.TouchEvent) {
-    const element = (e.target as HTMLElement);
+    const element = e.target as HTMLElement;
     const chessboard = chessboardRef.current;
     if (!element.classList.contains("chess-piece") || !chessboard) return;
 
@@ -28,12 +28,12 @@ export default function Chessboard({ playMove, pieces }: Props) {
     const grabY = Math.floor((chessboard.offsetTop + chessboard.clientHeight - clientY) / tileSize);
     setGrabPosition(new Position(grabX, grabY));
 
-    const x = clientX - tileSize / 2;
-    const y = clientY - tileSize / 2;
+    const x = clientX - tileSize / 2 - chessboard.offsetLeft;
+    const y = clientY - tileSize / 2 - chessboard.offsetTop;
     element.style.position = "absolute";
-    element.style.left = `${x}px`;
-    element.style.top = `${y}px`;
-    element.style.zIndex = "100"; // Ensure piece is above others
+    element.style.zIndex = "100"; // Bring piece to front
+    element.style.transform = `translate(${x}px, ${y}px)`; // Use transforms for smooth movement
+    element.classList.add("dragging"); // Disable transition during drag
     setActivePiece(element);
   }
 
@@ -46,16 +46,15 @@ export default function Chessboard({ playMove, pieces }: Props) {
     const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
 
     const tileSize = chessboard.clientWidth / 8;
-    const minX = chessboard.offsetLeft;
-    const minY = chessboard.offsetTop;
-    const maxX = chessboard.offsetLeft + chessboard.clientWidth - tileSize;
-    const maxY = chessboard.offsetTop + chessboard.clientHeight - tileSize;
+    const minX = 0; // Relative to chessboard
+    const minY = 0;
+    const maxX = chessboard.clientWidth - tileSize;
+    const maxY = chessboard.clientHeight - tileSize;
 
-    const x = Math.max(minX, Math.min(maxX, clientX - tileSize / 2));
-    const y = Math.max(minY, Math.min(maxY, clientY - tileSize / 2));
+    const x = Math.max(minX, Math.min(maxX, clientX - chessboard.offsetLeft - tileSize / 2));
+    const y = Math.max(minY, Math.min(maxY, clientY - chessboard.offsetTop - tileSize / 2));
 
-    activePiece.style.left = `${x}px`;
-    activePiece.style.top = `${y}px`;
+    activePiece.style.transform = `translate(${x}px, ${y}px)`;
   }
 
   // Unified event handler for dropping a piece
@@ -75,17 +74,18 @@ export default function Chessboard({ playMove, pieces }: Props) {
       const success = playMove(currentPiece.clone(), new Position(x, y));
       if (!success) {
         activePiece.style.position = "relative";
-        activePiece.style.removeProperty("top");
-        activePiece.style.removeProperty("left");
+        activePiece.style.transform = "translate(0, 0)"; // Reset to original position
         activePiece.style.removeProperty("z-index");
       }
     }
+    activePiece.classList.remove("dragging");
     setActivePiece(null);
   }
 
   // Prevent default touch behavior (e.g., scrolling)
   const preventTouchDefault = (e: React.TouchEvent) => e.preventDefault();
 
+  // Build the board
   let board = [];
   for (let j = VERTICAL_AXIS.length - 1; j >= 0; j--) {
     for (let i = 0; i < HORIZONTAL_AXIS.length; i++) {
@@ -101,17 +101,25 @@ export default function Chessboard({ playMove, pieces }: Props) {
   }
 
   return (
-    <div
-      onMouseDown={grabPiece}
-      onMouseMove={movePiece}
-      onMouseUp={dropPiece}
-      onTouchStart={grabPiece}
-      onTouchMove={(e) => { preventTouchDefault(e); movePiece(e); }}
-      onTouchEnd={(e) => { preventTouchDefault(e); dropPiece(e); }}
-      id="chessboard"
-      ref={chessboardRef}
-    >
-      {board}
+    <div id="chessboard-container">
+      <div
+        onMouseDown={grabPiece}
+        onMouseMove={movePiece}
+        onMouseUp={dropPiece}
+        onTouchStart={grabPiece}
+        onTouchMove={(e) => {
+          preventTouchDefault(e);
+          movePiece(e);
+        }}
+        onTouchEnd={(e) => {
+          preventTouchDefault(e);
+          dropPiece(e);
+        }}
+        id="chessboard"
+        ref={chessboardRef}
+      >
+        {board}
+      </div>
     </div>
   );
 }
