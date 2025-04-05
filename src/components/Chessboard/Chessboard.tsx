@@ -1,11 +1,7 @@
 import { useRef, useState } from "react";
 import "./Chessboard.css";
 import Tile from "../Tile/Tile";
-import {
-  VERTICAL_AXIS,
-  HORIZONTAL_AXIS,
-  GRID_SIZE,
-} from "../../Constants";
+import { VERTICAL_AXIS, HORIZONTAL_AXIS } from "../../Constants";
 import { Piece, Position } from "../../models";
 
 interface Props {
@@ -13,125 +9,109 @@ interface Props {
   pieces: Piece[];
 }
 
-export default function Chessboard({playMove, pieces} : Props) {
+export default function Chessboard({ playMove, pieces }: Props) {
   const [activePiece, setActivePiece] = useState<HTMLElement | null>(null);
   const [grabPosition, setGrabPosition] = useState<Position>(new Position(-1, -1));
   const chessboardRef = useRef<HTMLDivElement>(null);
 
-  function grabPiece(e: React.MouseEvent) {
-    const element = e.target as HTMLElement;
+  // Unified event handler for grabbing a piece (mouse or touch)
+  function grabPiece(e: React.MouseEvent | React.TouchEvent) {
+    const element = (e.target as HTMLElement);
     const chessboard = chessboardRef.current;
-    if (element.classList.contains("chess-piece") && chessboard) {
-      const grabX = Math.floor((e.clientX - chessboard.offsetLeft) / GRID_SIZE);
-      const grabY = Math.abs(
-        Math.ceil((e.clientY - chessboard.offsetTop - 800) / GRID_SIZE)
-      );
-      setGrabPosition(new Position(grabX, grabY));
+    if (!element.classList.contains("chess-piece") || !chessboard) return;
 
-      const x = e.clientX - GRID_SIZE / 2;
-      const y = e.clientY - GRID_SIZE / 2;
-      element.style.position = "absolute";
-      element.style.left = `${x}px`;
-      element.style.top = `${y}px`;
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
 
-      setActivePiece(element);
-    }
+    const tileSize = chessboard.clientWidth / 8; // Dynamic tile size
+    const grabX = Math.floor((clientX - chessboard.offsetLeft) / tileSize);
+    const grabY = Math.floor((chessboard.offsetTop + chessboard.clientHeight - clientY) / tileSize);
+    setGrabPosition(new Position(grabX, grabY));
+
+    const x = clientX - tileSize / 2;
+    const y = clientY - tileSize / 2;
+    element.style.position = "absolute";
+    element.style.left = `${x}px`;
+    element.style.top = `${y}px`;
+    element.style.zIndex = "100"; // Ensure piece is above others
+    setActivePiece(element);
   }
 
-  function movePiece(e: React.MouseEvent) {
+  // Unified event handler for moving a piece
+  function movePiece(e: React.MouseEvent | React.TouchEvent) {
     const chessboard = chessboardRef.current;
-    if (activePiece && chessboard) {
-      const minX = chessboard.offsetLeft - 25;
-      const minY = chessboard.offsetTop - 25;
-      const maxX = chessboard.offsetLeft + chessboard.clientWidth - 75;
-      const maxY = chessboard.offsetTop + chessboard.clientHeight - 75;
-      const x = e.clientX - 50;
-      const y = e.clientY - 50;
-      activePiece.style.position = "absolute";
+    if (!activePiece || !chessboard) return;
 
-      //If x is smaller than minimum amount
-      if (x < minX) {
-        activePiece.style.left = `${minX}px`;
-      }
-      //If x is bigger than maximum amount
-      else if (x > maxX) {
-        activePiece.style.left = `${maxX}px`;
-      }
-      //If x is in the constraints
-      else {
-        activePiece.style.left = `${x}px`;
-      }
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
 
-      //If y is smaller than minimum amount
-      if (y < minY) {
-        activePiece.style.top = `${minY}px`;
-      }
-      //If y is bigger than maximum amount
-      else if (y > maxY) {
-        activePiece.style.top = `${maxY}px`;
-      }
-      //If y is in the constraints
-      else {
-        activePiece.style.top = `${y}px`;
-      }
-    }
+    const tileSize = chessboard.clientWidth / 8;
+    const minX = chessboard.offsetLeft;
+    const minY = chessboard.offsetTop;
+    const maxX = chessboard.offsetLeft + chessboard.clientWidth - tileSize;
+    const maxY = chessboard.offsetTop + chessboard.clientHeight - tileSize;
+
+    const x = Math.max(minX, Math.min(maxX, clientX - tileSize / 2));
+    const y = Math.max(minY, Math.min(maxY, clientY - tileSize / 2));
+
+    activePiece.style.left = `${x}px`;
+    activePiece.style.top = `${y}px`;
   }
 
-  function dropPiece(e: React.MouseEvent) {
+  // Unified event handler for dropping a piece
+  function dropPiece(e: React.MouseEvent | React.TouchEvent) {
     const chessboard = chessboardRef.current;
-    if (activePiece && chessboard) {
-      const x = Math.floor((e.clientX - chessboard.offsetLeft) / GRID_SIZE);
-      const y = Math.abs(
-        Math.ceil((e.clientY - chessboard.offsetTop - 800) / GRID_SIZE)
-      );
+    if (!activePiece || !chessboard) return;
 
-      const currentPiece = pieces.find((p) =>
-        p.samePosition(grabPosition)
-      );
+    const clientX = "changedTouches" in e ? e.changedTouches[0].clientX : e.clientX;
+    const clientY = "changedTouches" in e ? e.changedTouches[0].clientY : e.clientY;
 
-      if (currentPiece) {
-        var succes = playMove(currentPiece.clone(), new Position(x, y));
+    const tileSize = chessboard.clientWidth / 8;
+    const x = Math.floor((clientX - chessboard.offsetLeft) / tileSize);
+    const y = Math.floor((chessboard.offsetTop + chessboard.clientHeight - clientY) / tileSize);
 
-        if(!succes) {
-          //RESETS THE PIECE POSITION
-          activePiece.style.position = "relative";
-          activePiece.style.removeProperty("top");
-          activePiece.style.removeProperty("left");
-        }
+    const currentPiece = pieces.find((p) => p.samePosition(grabPosition));
+    if (currentPiece) {
+      const success = playMove(currentPiece.clone(), new Position(x, y));
+      if (!success) {
+        activePiece.style.position = "relative";
+        activePiece.style.removeProperty("top");
+        activePiece.style.removeProperty("left");
+        activePiece.style.removeProperty("z-index");
       }
-      setActivePiece(null);
     }
+    setActivePiece(null);
   }
+
+  // Prevent default touch behavior (e.g., scrolling)
+  const preventTouchDefault = (e: React.TouchEvent) => e.preventDefault();
 
   let board = [];
-
   for (let j = VERTICAL_AXIS.length - 1; j >= 0; j--) {
     for (let i = 0; i < HORIZONTAL_AXIS.length; i++) {
       const number = j + i + 2;
-      const piece = pieces.find((p) =>
-        p.samePosition(new Position(i, j))
-      );
-      let image = piece ? piece.image : undefined;
+      const piece = pieces.find((p) => p.samePosition(new Position(i, j)));
+      const image = piece ? piece.image : undefined;
 
-      let currentPiece = activePiece != null ? pieces.find(p => p.samePosition(grabPosition)) : undefined;
-      let highlight = currentPiece?.possibleMoves ? 
-      currentPiece.possibleMoves.some(p => p.samePosition(new Position(i, j))) : false;
+      const currentPiece = activePiece ? pieces.find((p) => p.samePosition(grabPosition)) : undefined;
+      const highlight = currentPiece?.possibleMoves?.some((p) => p.samePosition(new Position(i, j))) || false;
 
       board.push(<Tile key={`${j},${i}`} image={image} number={number} highlight={highlight} />);
     }
   }
 
   return (
-    <>
-      <div
-        onMouseMove={(e) => movePiece(e)}
-        onMouseDown={(e) => grabPiece(e)}
-        onMouseUp={(e) => dropPiece(e)}
-        id="chessboard"
-        ref={chessboardRef}
-      >
-        {board}
-      </div>
-    </>
+    <div
+      onMouseDown={grabPiece}
+      onMouseMove={movePiece}
+      onMouseUp={dropPiece}
+      onTouchStart={grabPiece}
+      onTouchMove={(e) => { preventTouchDefault(e); movePiece(e); }}
+      onTouchEnd={(e) => { preventTouchDefault(e); dropPiece(e); }}
+      id="chessboard"
+      ref={chessboardRef}
+    >
+      {board}
+    </div>
   );
 }
