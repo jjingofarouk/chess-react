@@ -48,12 +48,14 @@ export class Board {
 
   /** Initializes the board and validates its state */
   private initializeBoard() {
-    const whiteKings = this.pieces.filter((p) => p.isKing && p.team === TeamType.OUR).length;
-    const blackKings = this.pieces.filter((p) => p.isKing && p.team === TeamType.OPPONENT).length;
-    if (whiteKings !== 1 || blackKings !== 1) {
-      throw new Error("Invalid board: Must have exactly one king per team.");
-    }
+  const whiteKings = this.pieces.filter((p) => p.isKing && p.team === TeamType.OUR);
+  const blackKings = this.pieces.filter((p) => p.isKing && p.team === TeamType.OPPONENT);
+  console.log("White kings:", whiteKings.length, whiteKings);
+  console.log("Black kings:", blackKings.length, blackKings);
+  if (whiteKings.length !== 1 || blackKings.length !== 1) {
+    throw new Error("Invalid board: Must have exactly one king per team.");
   }
+}
 
   /** Calculates all legal moves for the current team */
   calculateAllMoves(): void {
