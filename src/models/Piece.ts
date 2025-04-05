@@ -2,58 +2,108 @@ import { TeamType, PieceType } from "../Types";
 import { Position } from "./Position";
 
 export class Piece {
-    image: string;
-    position: Position;
-    type: PieceType;
-    team: TeamType;
-    possibleMoves?: Position[];
-    hasMoved: boolean;
-    constructor(position: Position, type: PieceType,
-        team: TeamType, hasMoved: boolean,
-        possibleMoves: Position[] = []) {
-        this.image = `assets/images/${type}_${team}.png`;
-        this.position = position;
-        this.type = type;
-        this.team = team;
-        this.possibleMoves = possibleMoves;
-        this.hasMoved = hasMoved;
-    }
+  private _position: Position;
+  private _type: PieceType;
+  private _team: TeamType;
+  private _hasMoved: boolean;
+  private _possibleMoves: Position[];
 
-    get isPawn() : boolean {
-        return this.type === PieceType.PAWN
-    }
+  constructor(
+    position: Position,
+    type: PieceType,
+    team: TeamType,
+    hasMoved: boolean = false,
+    possibleMoves: Position[] = []
+  ) {
+    this._position = position.clone();
+    this._type = type;
+    this._team = team;
+    this._hasMoved = hasMoved;
+    this._possibleMoves = possibleMoves.map((m) => m.clone());
+  }
 
-    get isRook() : boolean {
-        return this.type === PieceType.ROOK
-    }
+  get image(): string {
+    return `assets/images/${this._type}_${this._team}.png`;
+  }
 
-    get isKnight() : boolean {
-        return this.type === PieceType.KNIGHT
-    }
+  get position(): Position {
+    return this._position;
+  }
 
-    get isBishop() : boolean {
-        return this.type === PieceType.BISHOP
-    }
+  set position(value: Position) {
+    this._position = value.clone();
+  }
 
-    get isKing() : boolean {
-        return this.type === PieceType.KING
-    }
+  get type(): PieceType {
+    return this._type;
+  }
 
-    get isQueen() : boolean {
-        return this.type === PieceType.QUEEN
-    }
+  get team(): TeamType {
+    return this._team;
+  }
 
-    samePiecePosition(otherPiece: Piece) : boolean {
-        return this.position.samePosition(otherPiece.position);
-    }
+  get hasMoved(): boolean {
+    return this._hasMoved;
+  }
 
-    samePosition(otherPosition: Position) : boolean {
-        return this.position.samePosition(otherPosition);
-    }
+  set hasMoved(value: boolean) {
+    this._hasMoved = value;
+  }
 
-    clone(): Piece {
-        return new Piece(this.position.clone(),
-             this.type, this.team, this.hasMoved,
-             this.possibleMoves?.map(m => m.clone()));
-    }
+  get possibleMoves(): Position[] {
+    return this._possibleMoves;
+  }
+
+  set possibleMoves(value: Position[]) {
+    this._possibleMoves = value.map((m) => m.clone());
+  }
+
+  isPawn(): this is Pawn {
+    return this._type === PieceType.PAWN;
+  }
+
+  isRook(): boolean {
+    return this._type === PieceType.ROOK;
+  }
+
+  isKnight(): boolean {
+    return this._type === PieceType.KNIGHT;
+  }
+
+  isBishop(): boolean {
+    return this._type === PieceType.BISHOP;
+  }
+
+  isKing(): boolean {
+    return this._type === PieceType.KING;
+  }
+
+  isQueen(): boolean {
+    return this._type === PieceType.QUEEN;
+  }
+
+  samePiecePosition(otherPiece: Piece): boolean {
+    return this._position.samePosition(otherPiece._position);
+  }
+
+  samePosition(otherPosition: Position): boolean {
+    return this._position.samePosition(otherPosition);
+  }
+
+  clone(): Piece {
+    return new Piece(
+      this._position.clone(),
+      this._type,
+      this._team,
+      this._hasMoved,
+      this._possibleMoves.map((m) => m.clone())
+    );
+  }
+
+  resetTransientStates(): void {
+    this._possibleMoves = [];
+  }
 }
+
+export { Pawn } from "./Pawn";
+``` ​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​
