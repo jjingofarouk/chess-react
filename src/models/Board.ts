@@ -25,8 +25,8 @@ export class Board {
   private totalTurns: number;
   private gameState: GameState = GameState.ONGOING;
   private winningTeam: TeamType | null = null;
-  private moveHistory: { from: Position; to: Position; captured?: Piece }[] = []; // For draw detection
-  private fiftyMoveCounter: number = 0; // For 50-move rule
+  private moveHistory: { from: Position; to: Position; captured?: Piece }[] = [];
+  private fiftyMoveCounter: number = 0;
 
   constructor(pieces: Piece[], totalTurns: number = 0) {
     this.pieces = pieces.map((p) => p.clone()); // Deep copy to avoid mutation
@@ -46,18 +46,24 @@ export class Board {
     return this.winningTeam;
   }
 
-  /** Initializes the board and validates its state */
-private initializeBoard() {
-  const whiteKings = this.pieces.filter((p) => p.isKing && p.team === TeamType.OUR);
-  const blackKings = this.pieces.filter((p) => p.isKing && p.team === TeamType.OPPONENT);
-  console.log("White pieces:", this.pieces.filter((p) => p.team === TeamType.OUR).map(p => ({ type: p.type, isKing: p.isKing })));
-  console.log("Black pieces:", this.pieces.filter((p) => p.team === TeamType.OPPONENT).map(p => ({ type: p.type, isKing: p.isKing })));
-  console.log("White kings count:", whiteKings.length, whiteKings);
-  console.log("Black kings count:", blackKings.length, blackKings);
-  if (whiteKings.length !== 1 || blackKings.length !== 1) {
-    throw new Error("Invalid board: Must have exactly one king per team.");
+  getPieces(): Piece[] {
+    return this.pieces.map((p) => p.clone());
   }
-}
+
+  /** Initializes the board and validates its state */
+  private initializeBoard(): void {
+    const whiteKings = this.pieces.filter((p) => p.type === PieceType.KING && p.team === TeamType.OUR);
+    const blackKings = this.pieces.filter((p) => p.type === PieceType.KING && p.team === TeamType.OPPONENT);
+    if (whiteKings.length !== 1 || blackKings.length !== 1) {
+      console.error("Invalid board state:", {
+        whiteKings: whiteKings.length,
+        blackKings: blackKings.length,
+        pieces: this.pieces.map((p) => ({ type: p.type, team: p.team, pos: p.position })),
+      });
+      throw new Error("Invalid board: Must have exactly one king per team.");
+    }
+  }
+
   /** Calculates all legal moves for the current team */
   calculateAllMoves(): void {
     if (this.gameState !== GameState.ONGOING) return;
@@ -71,7 +77,7 @@ private initializeBoard() {
     }
 
     // Step 2: Add castling moves
-    const king = currentTeamPieces.find((p) => p.isKing);
+    const king = currentTeamPieces.find((p) => p.type === PieceType.KING);
     if (king && !king.hasMoved) {
       king.possibleMoves = [...(king.possibleMoves || []), ...getCastlingMoves(king, this.pieces)];
     }
@@ -90,7 +96,7 @@ private initializeBoard() {
       piece.possibleMoves = piece.possibleMoves.filter((move) => {
         const simulatedBoard = this.simulateMove(piece, move);
         const king = simulatedBoard.pieces.find(
-          (p) => p.isKing && p.team === this.currentTeam
+          (p) => p.type === PieceType.KING && p.team === this.currentTeam
         )!;
         return !simulatedBoard.isKingInCheck(king, opponentPieces);
       });
@@ -102,7 +108,7 @@ private initializeBoard() {
     const hasLegalMoves = currentTeamPieces.some((p) => p.possibleMoves?.length > 0);
 
     if (!hasLegalMoves) {
-      const king = currentTeamPieces.find((p) => p.isKing)!;
+      const king = currentTeamPieces.find((p) => p.type === PieceType.KING)!;
       const opponentPieces = this.pieces.filter((p) => p.team !== this.currentTeam);
       if (this.isKingInCheck(king, opponentPieces)) {
         this.gameState = GameState.CHECKMATE;
@@ -155,11 +161,7 @@ private initializeBoard() {
   }
 
   /** Executes a move and updates the board state */
-  playMove(
-    playedPiece: Piece,
-    destination: Position,
-    promotionType?: PieceType // Optional for pawn promotion
-  ): boolean {
+  playMove(playedPiece: Piece, destination: Position, promotionType?: PieceType): boolean {
     if (this.gameState !== GameState.ONGOING) return false;
 
     const validMoves = playedPiece.possibleMoves || [];
@@ -170,20 +172,14 @@ private initializeBoard() {
     const destinationPiece = this.pieces.find((p) => p.samePosition(destination));
     const enPassantMove = this.isEnPassantMove(playedPiece, destination);
 
-    // Handle castling
     if (this.isCastlingMove(playedPiece, destinationPiece)) {
       this.executeCastling(playedPiece, destinationPiece);
-    }
-    // Handle en passant
-    else if (enPassantMove) {
+    } else if (enPassantMove) {
       this.executeEnPassant(playedPiece, destination, pawnDirection);
-    }
-    // Handle standard move or capture
-    else {
+    } else {
       this.executeStandardMove(playedPiece, destination, promotionType);
     }
 
-    // Update move history and counters
     this.moveHistory.push({
       from: playedPiece.position.clone(),
       to: destination.clone(),
@@ -198,16 +194,14 @@ private initializeBoard() {
 
   /** Checks if the move is an en passant capture */
   private isEnPassantMove(playedPiece: Piece, destination: Position): boolean {
-    if (!playedPiece.isPawn) return false;
+    if (playedPiece.type !== PieceType.PAWN) return false;
     const pawn = playedPiece as Pawn;
     const pawnDirection = playedPiece.team === TeamType.OUR ? 1 : -1;
     return (
       pawn.enPassant &&
       destination.x !== playedPiece.position.x &&
       !this.pieces.some((p) => p.samePosition(destination)) &&
-      this.pieces.some((p) =>
-        p.samePosition(new Position(destination.x, destination.y - pawnDirection))
-      )
+      this.pieces.some((p) => p.samePosition(new Position(destination.x, destination.y - pawnDirection)))
     );
   }
 
@@ -225,8 +219,8 @@ private initializeBoard() {
   /** Checks if the move is a castling move */
   private isCastlingMove(playedPiece: Piece, destinationPiece?: Piece): boolean {
     return (
-      playedPiece.isKing &&
-      destinationPiece?.isRook &&
+      playedPiece.type === PieceType.KING &&
+      destinationPiece?.type === PieceType.ROOK &&
       destinationPiece.team === playedPiece.team &&
       !playedPiece.hasMoved &&
       !destinationPiece.hasMoved
@@ -246,12 +240,8 @@ private initializeBoard() {
   }
 
   /** Executes a standard move or capture */
-  private executeStandardMove(
-    playedPiece: Piece,
-    destination: Position,
-    promotionType?: PieceType
-  ): void {
-    const isPawnMove = playedPiece.isPawn;
+  private executeStandardMove(playedPiece: Piece, destination: Position, promotionType?: PieceType): void {
+    const isPawnMove = playedPiece.type === PieceType.PAWN;
     playedPiece.position = destination.clone();
     playedPiece.hasMoved = true;
 
@@ -260,7 +250,6 @@ private initializeBoard() {
       pawn.enPassant = Math.abs(destination.y - (pawn.hasMoved ? destination.y : pawn.position.y)) === 2;
       this.clearEnPassantFlags(pawn);
 
-      // Handle promotion
       if (this.isPromotionMove(pawn)) {
         this.promotePawn(pawn, promotionType || PieceType.QUEEN);
       }
@@ -272,7 +261,7 @@ private initializeBoard() {
   /** Clears en passant flags for all pawns except the specified one */
   private clearEnPassantFlags(exceptPawn?: Pawn): void {
     for (const piece of this.pieces) {
-      if (piece.isPawn && piece !== exceptPawn) {
+      if (piece.type === PieceType.PAWN && piece !== exceptPawn) {
         (piece as Pawn).enPassant = false;
       }
     }
@@ -291,14 +280,14 @@ private initializeBoard() {
 
   /** Updates the 50-move rule counter */
   private updateFiftyMoveCounter(playedPiece: Piece, capturedPiece?: Piece): number {
-    return playedPiece.isPawn || capturedPiece ? 0 : this.fiftyMoveCounter + 1;
+    return playedPiece.type === PieceType.PAWN || capturedPiece ? 0 : this.fiftyMoveCounter + 1;
   }
 
-  /** Checks for threefold repetition (simplified, use Zobrist hashing for production) */
+  /** Checks for threefold repetition (simplified) */
   private isDrawByRepetition(): boolean {
     const positionCount = new Map<string, number>();
     for (const move of this.moveHistory) {
-      const key = this.serializePosition(); // Simplified; use Zobrist hash in practice
+      const key = this.serializePosition();
       positionCount.set(key, (positionCount.get(key) || 0) + 1);
       if (positionCount.get(key)! >= 3) return true;
     }
@@ -318,9 +307,8 @@ private initializeBoard() {
     return new Board(this.pieces, this.totalTurns);
   }
 
-  /** Serializes the board to FEN (placeholder for extensibility) */
+  /** Serializes the board to FEN (placeholder) */
   toFEN(): string {
-    // Implement FEN notation here for saving/loading games
     return "rnbqkbnr/pppppppp/5n5/8/8/5N5/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; // Example
   }
 }
