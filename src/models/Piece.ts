@@ -1,12 +1,12 @@
-import { TeamType, PieceType } from "../Types";
 import { Position } from "./Position";
+import { PieceType, TeamType } from "../Types";
 
 export class Piece {
   private _position: Position;
   private _type: PieceType;
   private _team: TeamType;
   private _hasMoved: boolean;
-  private _possibleMoves: Position[];
+  public possibleMoves: Position[];
 
   constructor(
     position: Position,
@@ -19,11 +19,7 @@ export class Piece {
     this._type = type;
     this._team = team;
     this._hasMoved = hasMoved;
-    this._possibleMoves = possibleMoves.map((m) => m.clone());
-  }
-
-  get image(): string {
-    return `assets/images/${this._type}_${this._team}.png`;
+    this.possibleMoves = possibleMoves.map((m) => m.clone());
   }
 
   get position(): Position {
@@ -50,38 +46,6 @@ export class Piece {
     this._hasMoved = value;
   }
 
-  get possibleMoves(): Position[] {
-    return this._possibleMoves;
-  }
-
-  set possibleMoves(value: Position[]) {
-    this._possibleMoves = value.map((m) => m.clone());
-  }
-
-  isPawn(): boolean {
-    return this._type === PieceType.PAWN;
-  }
-
-  isRook(): boolean {
-    return this._type === PieceType.ROOK;
-  }
-
-  isKnight(): boolean {
-    return this._type === PieceType.KNIGHT;
-  }
-
-  isBishop(): boolean {
-    return this._type === PieceType.BISHOP;
-  }
-
-  isKing(): boolean {
-    return this._type === PieceType.KING;
-  }
-
-  isQueen(): boolean {
-    return this._type === PieceType.QUEEN;
-  }
-
   samePiecePosition(otherPiece: Piece): boolean {
     return this._position.samePosition(otherPiece._position);
   }
@@ -96,14 +60,24 @@ export class Piece {
       this._type,
       this._team,
       this._hasMoved,
-      this._possibleMoves.map((m) => m.clone())
+      this.possibleMoves.map((m) => m.clone())
     );
-  }
-
-  resetTransientStates(): void {
-    this._possibleMoves = [];
   }
 }
 
-// Remove this if Pawn.ts imports Piece.ts to avoid circular dependency
-// export { Pawn } from "./Pawn";
+export class Pawn extends Piece {
+  public enPassant: boolean = false;
+
+  constructor(position: Position, team: TeamType, hasMoved: boolean = false) {
+    super(position, PieceType.PAWN, team, hasMoved);
+  }
+
+  clone(): Pawn {
+    const clonedPawn = new Pawn(this.position.clone(), this.team, this.hasMoved);
+    clonedPawn.enPassant = this.enPassant;
+    clonedPawn.possibleMoves = this.possibleMoves.map((m) => m.clone());
+    return clonedPawn;
+  }
+}
+
+export { PieceType, TeamType } from "../Types";
