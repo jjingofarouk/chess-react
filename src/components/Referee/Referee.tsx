@@ -3,24 +3,10 @@ import { initialBoard } from "../../Constants";
 import { Piece, Position } from "../../models";
 import { Board } from "../../models/Board";
 import { Pawn } from "../../models/Pawn";
-import {
-  bishopMove,
-  getPossibleBishopMoves,
-  getPossibleKingMoves,
-  getPossibleKnightMoves,
-  getPossiblePawnMoves,
-  getPossibleQueenMoves,
-  getPossibleRookMoves,
-  kingMove,
-  knightMove,
-  pawnMove,
-  queenMove,
-  rookMove,
-} from "../../referee/rules";
 import { PieceType, TeamType } from "../../Types";
 import Chessboard from "../Chessboard/Chessboard";
 import { Howl } from "howler";
-import "./Referee.css"; // New CSS file for styling
+import "./Referee.css";
 
 // Sound effects
 const moveSound = new Howl({ src: ["/sounds/move-self.mp3"] });
@@ -39,12 +25,11 @@ export default function Referee() {
   const [board, setBoard] = useState<Board>(initialBoard.clone());
   const [moveHistory, setMoveHistory] = useState<MoveHistory[]>([]);
   const [promotionPawn, setPromotionPawn] = useState<Piece | undefined>();
-  const [isMuted, setIsMuted] = useState(false); // Sound toggle
+  const [isMuted, setIsMuted] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const checkmateModalRef = useRef<HTMLDivElement>(null);
   const [gameOverMessage, setGameOverMessage] = useState<string>("");
 
-  // Recalculate moves on board change
   useEffect(() => {
     setBoard((prevBoard) => {
       const newBoard = prevBoard.clone();
@@ -56,7 +41,6 @@ export default function Referee() {
   function playMove(playedPiece: Piece, destination: Position): boolean {
     if (playedPiece.possibleMoves?.length === 0) return false;
 
-    // Turn enforcement
     const isWhiteTurn = board.totalTurns % 2 === 1;
     if (playedPiece.team === TeamType.OUR && !isWhiteTurn) return false;
     if (playedPiece.team === TeamType.OPPONENT && isWhiteTurn) return false;
@@ -64,35 +48,30 @@ export default function Referee() {
     const validMove = playedPiece.possibleMoves?.some((m) => m.samePosition(destination));
     if (!validMove) return false;
 
-    const enPassantMove = isEnPassantMove(playedPiece.position, destination, playedPiece.type, playedPiece.team);
     let capturedPiece: Piece | undefined;
 
     setBoard((prevBoard) => {
       const clonedBoard = prevBoard.clone();
-      clonedBoard.totalTurns += 1;
-
-      const moveResult = clonedBoard.playMove(enPassantMove, validMove, playedPiece, destination);
+      capturedPiece = clonedBoard.getPieces().find((p) => p.samePosition(destination));
+      const moveResult = clonedBoard.playMove(playedPiece, destination);
       if (!moveResult) return prevBoard;
 
-      capturedPiece = clonedBoard.lastCapturedPiece; // Assuming Board tracks this
       setMoveHistory((prev) => [
         ...prev,
         { piece: playedPiece.clone(), from: playedPiece.position.clone(), to: destination.clone(), captured: capturedPiece },
       ]);
 
-      // Sound logic
       if (!isMuted) {
         if (capturedPiece) captureSound.play();
-        else if (clonedBoard.isKingInCheck()) checkSound.play();
+        else if (clonedBoard.currentGameState === GameState.CHECKMATE) checkSound.play();
         else moveSound.play();
       }
 
-      // Game over conditions
-      if (clonedBoard.winningTeam !== undefined) {
-        setGameOverMessage(`Checkmate! ${clonedBoard.winningTeam === TeamType.OUR ? "White" : "Black"} wins!`);
+      if (clonedBoard.winningTeamResult !== null) {
+        setGameOverMessage(`Checkmate! ${clonedBoard.winningTeamResult === TeamType.OUR ? "White" : "Black"} wins!`);
         checkmateModalRef.current?.classList.remove("hidden");
         if (!isMuted) checkSound.play();
-      } else if (clonedBoard.isStalemate()) {
+      } else if (clonedBoard.currentGameState === GameState.STALEMATE) {
         setGameOverMessage("Stalemate! The game is a draw.");
         checkmateModalRef.current?.classList.remove("hidden");
       }
@@ -100,35 +79,14 @@ export default function Referee() {
       return clonedBoard;
     });
 
-    // Pawn promotion
     const promotionRow = playedPiece.team === TeamType.OUR ? 7 : 0;
-    if (destination.y === promotionRow && playedPiece.isPawn) {
+    if (destination.y === promotionRow && playedPiece.type === PieceType.PAWN) {
       modalRef.current?.classList.remove("hidden");
-      setPromotionPawn(playedPiece.clone().setPosition(destination));
+      setPromotionPawn(playedPiece.clone());
       if (!isMuted) promotionSound.play();
     }
 
     return true;
-  }
-
-  function isEnPassantMove(initialPosition: Position, desiredPosition: Position, type: PieceType, team: TeamType): boolean {
-    const pawnDirection = team === TeamType.OUR ? 1 : -1;
-    if (type !== PieceType.PAWN) return false;
-
-    if (
-      Math.abs(desiredPosition.x - initialPosition.x) === 1 &&
-      desiredPosition.y - initialPosition.y === pawnDirection
-    ) {
-      const piece = board.pieces.find(
-        (p) =>
-          p.position.x === desiredPosition.x &&
-          p.position.y === desiredPosition.y - pawnDirection &&
-          p.isPawn &&
-          (p as Pawn).enPassant
-      );
-      return !!piece;
-    }
-    return false;
   }
 
   function promotePawn(pieceType: PieceType) {
@@ -136,12 +94,10 @@ export default function Referee() {
 
     setBoard((prevBoard) => {
       const clonedBoard = prevBoard.clone();
-      clonedBoard.pieces = clonedBoard.pieces.map((piece) =>
-        piece.samePiecePosition(promotionPawn)
-          ? new Piece(piece.position.clone(), pieceType, piece.team, true)
-          : piece
-      );
-      clonedBoard.calculateAllMoves();
+      const moveResult = clonedBoard.playMove(promotionPawn, promotionPawn.position, pieceType);
+      if (moveResult) {
+        clonedBoard.calculateAllMoves();
+      }
       return clonedBoard;
     });
 
@@ -155,14 +111,11 @@ export default function Referee() {
     setBoard((prevBoard) => {
       const clonedBoard = prevBoard.clone();
       const lastMove = moveHistory[moveHistory.length - 1];
-      clonedBoard.totalTurns -= 1;
-
-      // Revert the move
-      const pieceToRevert = clonedBoard.pieces.find((p) => p.samePosition(lastMove.to));
+      const pieceToRevert = clonedBoard.getPieces().find((p) => p.samePosition(lastMove.to));
       if (pieceToRevert) {
         pieceToRevert.position = lastMove.from.clone();
         if (lastMove.captured) {
-          clonedBoard.pieces.push(lastMove.captured.clone());
+          clonedBoard.getPieces().push(lastMove.captured.clone());
         }
       }
       clonedBoard.calculateAllMoves();
@@ -187,13 +140,10 @@ export default function Referee() {
     <div className="referee-container">
       <div className="game-info">
         <p>Total turns: {board.totalTurns}</p>
-        <button onClick={undoLastMove} disabled={moveHistory.length === 0}>
-          Undo Move
-        </button>
+        <button onClick={undoLastMove} disabled={moveHistory.length === 0}>Undo Move</button>
         <button onClick={toggleSound}>{isMuted ? "Unmute" : "Mute"}</button>
       </div>
 
-      {/* Promotion Modal */}
       <div className="modal hidden" ref={modalRef} role="dialog" aria-label="Pawn Promotion">
         <div className="modal-body">
           <button onClick={() => promotePawn(PieceType.QUEEN)} aria-label="Promote to Queen">
@@ -211,7 +161,6 @@ export default function Referee() {
         </div>
       </div>
 
-      {/* Game Over Modal */}
       <div className="modal hidden" ref={checkmateModalRef} role="dialog" aria-label="Game Over">
         <div className="modal-body">
           <div className="game-over-body">
@@ -221,7 +170,7 @@ export default function Referee() {
         </div>
       </div>
 
-      <Chessboard playMove={playMove} pieces={board.pieces} />
+      <Chessboard playMove={playMove} pieces={board.getPieces()} />
     </div>
   );
 }
